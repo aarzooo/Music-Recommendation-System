@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Music Recommendation System</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background: #f8f9fa;
+        padding-top: 50px;
+      }
+      .container {
+        max-width: 700px;
+      }
+      .card {
+        border-radius: 16px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      input[list] {
+        appearance: none;
+        -webkit-appearance: none;
+      }
+      .recommendation-table th,
+      .recommendation-table td {
+        vertical-align: middle;
+      }
+      .text-warning {
+        color: #9e1212;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="text-center mb-4">
+        <h2 class="fw-bold">🎧 Music Recommendation System</h2>
+        <p class="text-muted">
+          Type or select a song to get similar recommendations
+        </p>
+      </div>
+
+      <div class="card p-4">
+        <form method="POST" action="/">
+          <div class="mb-3">
+            <label for="songInput" class="form-label"
+              >Enter or choose a song:</label
+            >
+            <!-- ✅ INPUT with datalist -->
+            <input
+              type="text"
+              list="song-list"
+              class="form-control"
+              id="songInput"
+              name="song_name"
+              placeholder="Start typing a song name..."
+              value="{{ selected_song_name or '' }}"
+              required
+            />
+
+            <datalist id="song-list">
+              {% for song in song_list %}
+              <option value="{{ song }}">{% endfor %}</option>
+            </datalist>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">
+              Get Recommendations
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {% if error_message %}
+      <div class="alert alert-danger mt-4">{{ error_message }}</div>
+      {% endif %} {% if recommendations is not none %}
+      <div class="card mt-4 p-4">
+        {% if recommendations.empty %}
+        <p class="text-warning">
+          ⚠️ No similar songs found in the same cluster for "{{
+          selected_song_name }}"
+        </p>
+        {% else %}
+        <h5>🎵 Recommended Songs:</h5>
+        <table class="table table-striped recommendation-table mt-3">
+          <thead>
+            <tr>
+              <th>Track Name</th>
+              <th>Artist</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for index, row in recommendations.iterrows() %}
+            <tr>
+              <td>{{ row['track_name'] }}</td>
+              <td>{{ row['track_artist'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <footer class="text-center mt-5 text-muted">
+        <small>&copy; 2025 Music Recommender App</small>
+      </footer>
+    </div>
+  </body>
+</html>
