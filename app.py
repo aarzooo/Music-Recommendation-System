@@ -24,50 +24,73 @@ except Exception as e:
     data = None
     kmeans_model = None
 
+def recommend_songs_by_cluster_kmeans(song_name, data):
 
-def find_similar_songs(song_name, data):
-    print("find_similar_songs : Start")
-    if data is None:
-        return pd.DataFrame(columns=['track_name', 'track_artist'])
+    # Basic check if data is usable (added for minimal safety, notebook version might assume valid data)
+    if data is None or not isinstance(data, pd.DataFrame):
+        print("Error: Input data is invalid.")
+        return None # Return None for consistency with "not found" case
+    if not all(col in data.columns for col in ['track_name', 'cluster_kmeans', 'track_artist']):
+         print("Error: Data is missing required columns ('track_name', 'cluster_kmeans', 'track_artist').")
+         return None # Return None for consistency
 
+    print(f"\n--- Running recommend_songs_by_cluster_kmeans for: '{song_name}' ---")
+
+    # Step 1: Search for the selected song using 'contains' (case-insensitive)
+    # NOTE: This uses the simpler 'contains' logic ONLY, like the original notebook function.
+    # It does NOT use re.escape() or the exact-match-first logic from find_similar_songs.
+    print("Step 1: Searching for song using 'contains'...")
+    selected_song = data[data['track_name'].str.contains(song_name, case=False, na=False)]
+
+    # Step 2: If the song is not found, display a message and return None
+    if selected_song.empty:
+        print(f"   Song containing '{song_name}' not found.")
+        return None # Return None as per original notebook function's behavior
+
+    # Handle multiple matches implicitly: .values[0] takes the first match found by 'contains'
+    if len(selected_song) > 1:
+         print(f"   Warning: Found {len(selected_song)} songs containing '{song_name}'. Using the first: '{selected_song['track_name'].values[0]}'")
+    else:
+         print(f"   Found song: '{selected_song['track_name'].values[0]}'")
+
+
+    # Step 3: Retrieve the cluster to which the selected song belongs
+    # Using .values[0] as in the original notebook function
     try:
-        selected_song = data[data['track_name'].str.lower() == song_name.lower()]
+        cluster = selected_song['cluster_kmeans'].values[0]
+        selected_track_name_val = selected_song['track_name'].values[0] # Get the name of the specific track found
+        print(f"Step 2: Selected song '{selected_track_name_val}' belongs to cluster: {cluster}")
+    except IndexError:
+        print("   Error: Could not retrieve cluster or track name (IndexError). This might happen with empty intermediate data.")
+        return None
+    except KeyError as e:
+         print(f"   Error: Missing column required for cluster/track name retrieval: {e}")
+         return None
 
-        if selected_song.empty:
-            song_name_escaped = re.escape(song_name)
-            selected_song = data[data['track_name'].str.contains(song_name_escaped, case=False, na=False)]
 
-            if selected_song.empty:
-                print(f"Song '{song_name}' not found in the dataset.")
-                return pd.DataFrame(columns=['track_name', 'track_artist'])
+    # Step 4: Find all songs that belong to the same cluster as the selected song
+    print(f"Step 3: Finding all songs in cluster {cluster}...")
+    # Note: This includes the selected song initially
+    recommended_songs = data[data['cluster_kmeans'] == cluster].copy() # Use copy to avoid warnings
+    print(f"   Found {len(recommended_songs)} total songs in cluster {cluster} (including selected).")
 
-        if len(selected_song) > 1:
-            selected_song = selected_song.iloc[[0]]
 
-        if 'cluster_kmeans' not in selected_song.columns:
-            return pd.DataFrame(columns=['track_name', 'track_artist'])
+    # Step 5: Exclude the specific selected song from the recommendations
+    # Using .values[0] for the track name as in the original notebook function
+    print(f"Step 4: Excluding the selected song '{selected_track_name_val}' from recommendations...")
+    recommended_songs = recommended_songs[recommended_songs['track_name'] != selected_track_name_val]
+    print(f"   Found {len(recommended_songs)} other songs in the cluster.")
 
-        cluster = selected_song['cluster_kmeans'].iloc[0]
-        selected_track_name = selected_song['track_name'].iloc[0]
 
-        if 'track_name' not in data.columns:
-            return pd.DataFrame(columns=['track_name', 'track_artist'])
-
-        similar_songs = data[
-            (data['cluster_kmeans'] == cluster) & (data['track_name'] != selected_track_name)
-        ]
-
-        if similar_songs.empty:
-            print("No similar songs found.")
-            return pd.DataFrame(columns=['track_name', 'track_artist'])
-
-        print("find_similar_songs : End")
-        return similar_songs[['track_name', 'track_artist']].head(10)
-
-    except Exception as e:
-        print(f"Error during recommendation: {e}")
+    # Step 6: Return only the 'track_name' and 'track_artist', limited to the top 10
+    if recommended_songs.empty:
+        print("   No other similar songs found in the same cluster.")
+        # Return empty DataFrame, consistent with returning DF on success
         return pd.DataFrame(columns=['track_name', 'track_artist'])
 
+    print(f"Step 5: Selecting top {min(10, len(recommended_songs))} recommendations.")
+    print("--- recommend_songs_by_cluster_kmeans : End ---")
+    return recommended_songs[['track_name', 'track_artist']].head(10)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
